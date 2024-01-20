@@ -25,3 +25,12 @@ class Platform(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
         self.rect.x = x
         self.rect.y = y
+
+    def update(self, scroll):
+
+        # Update platforms vertically
+        self.rect.y += scroll
+
+        # Check if platform is off the screen
+        if self.rect.top > SCREEN_HEIGHT:
+            self.kill()
