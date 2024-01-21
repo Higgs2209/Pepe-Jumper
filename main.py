@@ -2,6 +2,11 @@ from utils import resource_path
 import pygame
 from platform import Platform
 import random
+from draw_text import draw_text, font_big, font_small, font_small_bold
+from info_panel import draw_panel
+import os
+
+
 
 # initialize pygame
 pygame.init()
@@ -12,6 +17,8 @@ SCREEN_HEIGHT = 600
 
 # Define Colours
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+PANEL = (153, 217, 234)
 
 # Game Variables
 GRAVITY = 1
@@ -19,6 +26,18 @@ MAX_PLATFORMS = 20
 SCROLL_THRESHOLD = 150
 
 bg_scroll = 0
+
+game_over = False
+
+score = 0
+
+fade_counter = 0
+
+if os.path.exists('score.txt'):
+    with open('score.txt', 'r') as file:
+        high_score = int(file.read())
+else:
+    high_score = 0
 
 # Set frame rate
 clock = pygame.time.Clock()
@@ -34,6 +53,9 @@ pepe_image = pygame.image.load(PEPE_RESOURCE_PATH).convert_alpha()
 BG_RESOURCE_PATH = resource_path("assets/bg.png")
 bg_image = pygame.image.load(BG_RESOURCE_PATH).convert_alpha()
 
+# Bird Sprite Sheet
+BIRD_SHEET_PATH = resource_path("assets/bird.png")
+bird_sheet_img = pygame.image.load(BIRD_SHEET_PATH).convert_alpha()
 
 # Function to draw the background
 def draw_background(bg_scroll):
@@ -117,11 +139,6 @@ class Player(pygame.sprite.Sprite):
         # if platform.mask.overlap(self.pepe_mask, (self.rect.x, self.rect.y)):
         #      print("Collide")
 
-        # Check if the player goes of the bottom of the screen
-        if self.rect.bottom + self.dy > SCREEN_HEIGHT:
-            self.dy = 0
-            self.vel_y = -20
-
         # Check if player has hit the scroll line
         if pepe.rect.top <= SCROLL_THRESHOLD:
             # If player is jumping
@@ -168,7 +185,7 @@ def platform_generation(platform):
 platform_group = pygame.sprite.Group()
 
 # create starting platform
-platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100)
+platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
 platform_group.add(platform)
 
 
@@ -193,40 +210,97 @@ while run:
     # Set Frame Rate
     clock.tick(FPS)
 
-    platform_generation(platform)
+    if not game_over:
 
-    # Run move method
-    scroll = pepe.move()
+        platform_generation(platform)
 
-    # draw background
-    bg_scroll += scroll
-    if bg_scroll >= 600:
-        bg_scroll = 0
-    draw_background(bg_scroll)
+        # Run move method
+        scroll = pepe.move()
 
-    pygame.draw.line(screen, WHITE, (0, SCROLL_THRESHOLD), (SCREEN_WIDTH, SCROLL_THRESHOLD))
+        # draw background
+        bg_scroll += scroll
+        if bg_scroll >= 600:
+            bg_scroll = 0
+        draw_background(bg_scroll)
 
-    if len(platform_group) < MAX_PLATFORMS:
-        p_w = random.randint(40, 60)
-        p_x = random.randint(0, SCREEN_WIDTH - p_w)
-        print(p_x)
-        p_y = platform.rect.y - random.randint(50, 100)
-        platform = Platform(p_x, p_y, p_w)
-        # print(platform.rect.y)
-        # print(p_y)
-        platform_group.add(platform)
+        pygame.draw.line(screen, WHITE, (0, SCROLL_THRESHOLD), (SCREEN_WIDTH, SCROLL_THRESHOLD))
 
-    # print(len(platform_group))
+        if len(platform_group) < MAX_PLATFORMS:
+            p_w = random.randint(40, 60)
+            p_x = random.randint(0, SCREEN_WIDTH - p_w)
+            print(p_x)
+            p_y = platform.rect.y - random.randint(50, 100)
+            p_type = random.randint(1, 2)
+            if p_type == 1 and score > 500:
+                p_moving = True
+            else:
+                p_moving = False
 
-    # Draw Sprites
-    platform_group.draw(screen)
-    pepe.draw()
+            platform = Platform(p_x, p_y, p_w, p_moving)
+            platform_group.add(platform)
 
-    # update platforms
-    platform_group.update(scroll)
+        # print(len(platform_group))
 
-    # Check for collisions
-    collide(platform_group, platform)
+        # Draw Sprites
+        platform_group.draw(screen)
+        pepe.draw()
+
+        # Draw Panel
+        draw_panel(screen, score, font_small, WHITE, PANEL)
+
+        # update platforms
+        platform_group.update(scroll)
+
+        # Score
+        if scroll > 0:
+            score += scroll
+
+        # draw line and High Score text at prior old score
+        draw_text(screen, "HIGH SCORE", font_small_bold, BLACK, 0, score - high_score + SCROLL_THRESHOLD)
+        pygame.draw.line(screen, BLACK, (0, score - high_score + SCROLL_THRESHOLD),(SCREEN_WIDTH, score - high_score + SCROLL_THRESHOLD), 3)
+
+        # Check for collisions
+        collide(platform_group, platform)
+
+        # Check game over
+        if pepe.rect.top > SCREEN_HEIGHT:
+            game_over = True
+
+    else:
+        # Fade effect
+        if fade_counter < SCREEN_WIDTH:
+            fade_counter += 5
+            for y in range(0, 6, 2):
+                pygame.draw.rect(screen, BLACK, (0, y * 100, fade_counter, SCREEN_HEIGHT / 6))
+                pygame.draw.rect(screen, BLACK, (SCREEN_WIDTH - fade_counter, (y + 1) * 100, SCREEN_WIDTH, SCREEN_HEIGHT / 6))
+        else:
+            draw_text(screen, 'Game Over', font_big, WHITE, 130, 200)
+            draw_text(screen, f'SCORE:{score} ', font_big, WHITE, 130, 250)
+            draw_text(screen, 'Press space to play again', font_big, WHITE, 40, 300)
+            # Update high score
+            if score > high_score:
+                high_score = score
+                with open('score.txt', 'w') as file:
+                    file.write(str(high_score))
+            key = pygame.key.get_pressed()
+            if key[pygame.K_SPACE]:
+                # Reset Varibales
+                game_over = False
+                score = 0
+                scroll = 0
+
+                # Reposition Pepe
+                pepe.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
+
+                # Rest Platforms
+                platform_group.empty()
+                # create starting platform
+                platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
+                platform_group.add(platform)
+                fade_counter = 0
+
+
+
 
     # Event Handling
     for event in pygame.event.get():
