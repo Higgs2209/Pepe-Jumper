@@ -5,10 +5,12 @@ import random
 from draw_text import draw_text, font_big, font_small, font_small_bold
 from info_panel import draw_panel
 import os
-
-
+from spritesheet import SpriteSheet
+from enemy import Enemy
+from pygame import mixer
 
 # initialize pygame
+mixer.init()
 pygame.init()
 
 # Game window dimensions
@@ -56,6 +58,18 @@ bg_image = pygame.image.load(BG_RESOURCE_PATH).convert_alpha()
 # Bird Sprite Sheet
 BIRD_SHEET_PATH = resource_path("assets/bird.png")
 bird_sheet_img = pygame.image.load(BIRD_SHEET_PATH).convert_alpha()
+bird_sheet = SpriteSheet(bird_sheet_img)
+
+# music
+DEATH_MUSIC_RESOURCE_PATH = resource_path("assets/death.mp3")
+JUMP_MUSIC_RESOURCE_PATH = resource_path("assets/jump.mp3")
+MUSIC_RESOURCE_PATH = resource_path("assets/music.mp3")
+
+pygame.mixer.music.load(MUSIC_RESOURCE_PATH)
+pygame.mixer.music.set_volume(0.4)
+pygame.mixer.music.play(-1, 0.0)
+
+
 
 # Function to draw the background
 def draw_background(bg_scroll):
@@ -67,6 +81,7 @@ def draw_background(bg_scroll):
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
         pygame.sprite.Sprite.__init__(self)
+        self.pepe_mask = None
         self.image = pygame.transform.scale(pepe_image, (45, 45))
 
         # Create the player rectangle
@@ -75,8 +90,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (x, y)
 
-        # Create a mask
-        self.pepe_mask = pygame.mask.from_surface(self.image)
+        
 
         # Create momentum and direction
         self.momentum = 0
@@ -156,11 +170,14 @@ class Player(pygame.sprite.Sprite):
 
         # if self.pepe_mask.overlap(platform.mask, (self.rect.x, self.rect.y)):
         #    print("Collide")
+        
+        # Create a mask
+        self.pepe_mask = pygame.mask.from_surface(self.image)
         return scroll
 
     def draw(self):
         screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x - 12, self.rect.y - 5))
-        pygame.draw.rect(screen, WHITE, self.rect, 2)
+        #pygame.draw.rect(screen, WHITE, self.rect, 2)
 
         # Draw Mask
         # olist = self.pepe_mask.outline()
@@ -181,15 +198,20 @@ def platform_generation(platform):
     pass
 
 
-# Platform Instance
+# Platform group
 platform_group = pygame.sprite.Group()
+# Enemy Group
+enemy_group = pygame.sprite.Group()
+# enemy = Enemy()
+
 
 # create starting platform
 platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
 platform_group.add(platform)
 
 
-def collide(platform_group, platform):
+def platform_collide(platform_group, platform):
+
     if pygame.sprite.spritecollide(pepe, platform_group, False, pygame.sprite.collide_mask):
         # check if player is above rectangle
         # print(platform.rect.centery)
@@ -202,7 +224,13 @@ def collide(platform_group, platform):
                 pepe.vel_y = -20
             # pepe.rect.bottom = platform.rect.top
 
-            # print('collide')
+
+def enemy_collide():
+    enemy_collision = False
+    if pygame.sprite.spritecollide(pepe, enemy_group, False, pygame.sprite.collide_mask):
+        # print('collide')
+        enemy_collision = True
+    return enemy_collision
 
 
 while run:
@@ -223,8 +251,9 @@ while run:
             bg_scroll = 0
         draw_background(bg_scroll)
 
-        pygame.draw.line(screen, WHITE, (0, SCROLL_THRESHOLD), (SCREEN_WIDTH, SCROLL_THRESHOLD))
+        # pygame.draw.line(screen, WHITE, (0, SCROLL_THRESHOLD), (SCREEN_WIDTH, SCROLL_THRESHOLD))
 
+        # Generate Platforms
         if len(platform_group) < MAX_PLATFORMS:
             p_w = random.randint(40, 60)
             p_x = random.randint(0, SCREEN_WIDTH - p_w)
@@ -239,11 +268,18 @@ while run:
             platform = Platform(p_x, p_y, p_w, p_moving)
             platform_group.add(platform)
 
-        # print(len(platform_group))
+        # Generate Enemy's
+        if len(enemy_group) == 0 and score >= 1000:
+            enemy = Enemy(SCREEN_WIDTH, 100, bird_sheet, 1.5)
+            enemy_group.add(enemy)
+
+        # update enemy
+        enemy_group.update(scroll, SCREEN_WIDTH)
 
         # Draw Sprites
         platform_group.draw(screen)
         pepe.draw()
+        enemy_group.draw(screen)
 
         # Draw Panel
         draw_panel(screen, score, font_small, WHITE, PANEL)
@@ -257,14 +293,21 @@ while run:
 
         # draw line and High Score text at prior old score
         draw_text(screen, "HIGH SCORE", font_small_bold, BLACK, 0, score - high_score + SCROLL_THRESHOLD)
-        pygame.draw.line(screen, BLACK, (0, score - high_score + SCROLL_THRESHOLD),(SCREEN_WIDTH, score - high_score + SCROLL_THRESHOLD), 3)
+        pygame.draw.line(screen, BLACK, (0, score - high_score + SCROLL_THRESHOLD),
+                         (SCREEN_WIDTH, score - high_score + SCROLL_THRESHOLD), 3)
 
         # Check for collisions
-        collide(platform_group, platform)
+        platform_collide(platform_group, platform)
 
         # Check game over
         if pepe.rect.top > SCREEN_HEIGHT:
             game_over = True
+        # Check collision with enemies
+        enemy_bird_collision = enemy_collide()
+        if enemy_bird_collision:
+            game_over = True
+            print("Test")
+
 
     else:
         # Fade effect
@@ -272,7 +315,8 @@ while run:
             fade_counter += 5
             for y in range(0, 6, 2):
                 pygame.draw.rect(screen, BLACK, (0, y * 100, fade_counter, SCREEN_HEIGHT / 6))
-                pygame.draw.rect(screen, BLACK, (SCREEN_WIDTH - fade_counter, (y + 1) * 100, SCREEN_WIDTH, SCREEN_HEIGHT / 6))
+                pygame.draw.rect(screen, BLACK,
+                                 (SCREEN_WIDTH - fade_counter, (y + 1) * 100, SCREEN_WIDTH, SCREEN_HEIGHT / 6))
         else:
             draw_text(screen, 'Game Over', font_big, WHITE, 130, 200)
             draw_text(screen, f'SCORE:{score} ', font_big, WHITE, 130, 250)
@@ -288,7 +332,10 @@ while run:
                 game_over = False
                 score = 0
                 scroll = 0
+                fade_counter = 0
 
+                # Reset enemy
+                enemy_group.empty()
                 # Reposition Pepe
                 pepe.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150)
 
@@ -297,10 +344,6 @@ while run:
                 # create starting platform
                 platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
                 platform_group.add(platform)
-                fade_counter = 0
-
-
-
 
     # Event Handling
     for event in pygame.event.get():
