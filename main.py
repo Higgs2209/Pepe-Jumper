@@ -1,3 +1,4 @@
+import time
 from utils import resource_path
 import pygame
 from platform import Platform
@@ -8,6 +9,7 @@ import os
 from spritesheet import SpriteSheet
 from enemy import Enemy
 from pygame import mixer
+from apple import Apple
 
 # initialize pygame
 mixer.init()
@@ -24,7 +26,7 @@ PANEL = (153, 217, 234)
 
 # Game Variables
 GRAVITY = 1
-MAX_PLATFORMS = 20
+MAX_PLATFORMS = 30
 SCROLL_THRESHOLD = 150
 
 bg_scroll = 0
@@ -34,6 +36,11 @@ game_over = False
 score = 0
 
 fade_counter = 0
+
+apple_generation = 0
+
+apple_event = pygame.USEREVENT + 0
+pygame.time.set_timer(apple_event, 10000)
 
 if os.path.exists('score.txt'):
     with open('score.txt', 'r') as file:
@@ -65,10 +72,21 @@ DEATH_MUSIC_RESOURCE_PATH = resource_path("assets/death.mp3")
 JUMP_MUSIC_RESOURCE_PATH = resource_path("assets/jump.mp3")
 MUSIC_RESOURCE_PATH = resource_path("assets/music.mp3")
 
+# Background Music
 pygame.mixer.music.load(MUSIC_RESOURCE_PATH)
 pygame.mixer.music.set_volume(0.4)
 pygame.mixer.music.play(-1, 0.0)
 
+# Sound Effects
+jump_fx = pygame.mixer.Sound(JUMP_MUSIC_RESOURCE_PATH)
+jump_fx.set_volume(0.7)
+death_fx = pygame.mixer.Sound(DEATH_MUSIC_RESOURCE_PATH)
+death_fx.set_volume(0.5)
+
+# Apple Sprite Sheet import
+APPLE_RESOURCE_PATH = resource_path("assets/Apple.png")
+apple_sheet_img = pygame.image.load(APPLE_RESOURCE_PATH).convert_alpha()
+apple_sheet = SpriteSheet(apple_sheet_img)
 
 
 # Function to draw the background
@@ -89,8 +107,6 @@ class Player(pygame.sprite.Sprite):
         self.height = 40
         self.rect = pygame.Rect(0, 0, self.width, self.height)
         self.rect.center = (x, y)
-
-        
 
         # Create momentum and direction
         self.momentum = 0
@@ -170,14 +186,14 @@ class Player(pygame.sprite.Sprite):
 
         # if self.pepe_mask.overlap(platform.mask, (self.rect.x, self.rect.y)):
         #    print("Collide")
-        
+
         # Create a mask
         self.pepe_mask = pygame.mask.from_surface(self.image)
         return scroll
 
     def draw(self):
         screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x - 12, self.rect.y - 5))
-        #pygame.draw.rect(screen, WHITE, self.rect, 2)
+        # pygame.draw.rect(screen, WHITE, self.rect, 2)
 
         # Draw Mask
         # olist = self.pepe_mask.outline()
@@ -204,6 +220,8 @@ platform_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
 # enemy = Enemy()
 
+# Apple Group
+apple_group = pygame.sprite.Group()
 
 # create starting platform
 platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
@@ -211,17 +229,16 @@ platform_group.add(platform)
 
 
 def platform_collide(platform_group, platform):
-
     if pygame.sprite.spritecollide(pepe, platform_group, False, pygame.sprite.collide_mask):
         # check if player is above rectangle
         # print(platform.rect.centery)
         if pepe.rect.bottom > platform.rect.centery:
             if pepe.vel_y > 0:
                 # I don't think I need the below line
-
                 # Make pepe bounce
                 pepe.dy = 0
                 pepe.vel_y = -20
+                jump_fx.play()
             # pepe.rect.bottom = platform.rect.top
 
 
@@ -231,6 +248,14 @@ def enemy_collide():
         # print('collide')
         enemy_collision = True
     return enemy_collision
+
+
+def apple_gen():
+    if len(apple_group) == 0:
+        apple = Apple(SCREEN_WIDTH, apple_sheet, 1.8)
+        apple_group.add(apple)
+
+
 
 
 while run:
@@ -280,6 +305,9 @@ while run:
         platform_group.draw(screen)
         pepe.draw()
         enemy_group.draw(screen)
+        apple_group.update(scroll, SCREEN_WIDTH, SCREEN_HEIGHT)
+        apple_group.draw(screen)
+
 
         # Draw Panel
         draw_panel(screen, score, font_small, WHITE, PANEL)
@@ -302,11 +330,15 @@ while run:
         # Check game over
         if pepe.rect.top > SCREEN_HEIGHT:
             game_over = True
+            death_fx.play()
         # Check collision with enemies
         enemy_bird_collision = enemy_collide()
         if enemy_bird_collision:
             game_over = True
+            death_fx.play()
             print("Test")
+
+        #for event in pygame.event.get():
 
 
     else:
@@ -349,6 +381,9 @@ while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
+        if event.type == apple_event:
+            apple_gen()
+
 
     # Update Display
     pygame.display.update()

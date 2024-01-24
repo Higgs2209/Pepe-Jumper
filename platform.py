@@ -16,7 +16,7 @@ platform_image = pygame.image.load(PLATFORM_RESOURCE_PATH).convert_alpha()
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, moving):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.transform.scale(platform_image, (width, 10))
+        self.image = pygame.transform.scale(platform_image, (width, 50))
         self.rect = self.image.get_rect()
         self.mask = pygame.mask.from_surface(self.image)
         self.rect.x = x
