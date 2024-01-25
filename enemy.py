@@ -28,7 +28,7 @@ class Enemy(pygame.sprite.Sprite):
         # Select starting image and create retangle from it
         self.image = self.animation_list[self.frame_index]
         self.rect = self.image.get_rect()
-        self.mask = pygame.mask.from_surface(self.image)
+        #self.mask = pygame.mask.from_surface(self.image)
 
 
 
@@ -53,6 +53,7 @@ class Enemy(pygame.sprite.Sprite):
         if self.frame_index >= len(self.animation_list):
             self.frame_index = 0
 
+        #self.mask = pygame.mask.from_surface(self.image)
 
         # Move Enemy
         self.rect.x += self.direction * 2

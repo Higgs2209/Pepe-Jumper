@@ -1,12 +1,9 @@
 import pygame
 
 
-class Collide():
+class Collide:
     def __init__(self, pepe):
-        pepe = self.pepe
-
-
-
+        self.pepe = pepe
 
     def platform_collide(self, platform_group, platform, jump_fx):
         if pygame.sprite.spritecollide(self.pepe, platform_group, False, pygame.sprite.collide_mask):
@@ -27,3 +24,9 @@ class Collide():
             # print('collide')
             enemy_collision = True
         return enemy_collision
+
+    def apple_collision(self, apple_group):
+        apple_collision = False
+        if pygame.sprite.spritecollide(self.pepe, apple_group, False, pygame.sprite.collide_mask):
+            apple_collision = True
+        return apple_collision

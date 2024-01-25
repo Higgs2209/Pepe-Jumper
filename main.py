@@ -10,6 +10,7 @@ from spritesheet import SpriteSheet
 from enemy import Enemy
 from pygame import mixer
 from apple import Apple
+from collisions import Collide
 
 # initialize pygame
 mixer.init()
@@ -26,7 +27,7 @@ PANEL = (153, 217, 234)
 
 # Game Variables
 GRAVITY = 1
-MAX_PLATFORMS = 30
+MAX_PLATFORMS = 15
 SCROLL_THRESHOLD = 150
 
 bg_scroll = 0
@@ -40,7 +41,7 @@ fade_counter = 0
 apple_generation = 0
 
 apple_event = pygame.USEREVENT + 0
-pygame.time.set_timer(apple_event, 10000)
+pygame.time.set_timer(apple_event, 25000)
 
 if os.path.exists('score.txt'):
     with open('score.txt', 'r') as file:
@@ -227,35 +228,16 @@ apple_group = pygame.sprite.Group()
 platform = Platform(SCREEN_WIDTH // 2 - 50, SCREEN_HEIGHT - 50, 100, False)
 platform_group.add(platform)
 
-
-def platform_collide(platform_group, platform):
-    if pygame.sprite.spritecollide(pepe, platform_group, False, pygame.sprite.collide_mask):
-        # check if player is above rectangle
-        # print(platform.rect.centery)
-        if pepe.rect.bottom > platform.rect.centery:
-            if pepe.vel_y > 0:
-                # I don't think I need the below line
-                # Make pepe bounce
-                pepe.dy = 0
-                pepe.vel_y = -20
-                jump_fx.play()
-            # pepe.rect.bottom = platform.rect.top
+# Initialize collision class
+collision = Collide(pepe)
 
 
-def enemy_collide():
-    enemy_collision = False
-    if pygame.sprite.spritecollide(pepe, enemy_group, False, pygame.sprite.collide_mask):
-        # print('collide')
-        enemy_collision = True
-    return enemy_collision
 
 
 def apple_gen():
     if len(apple_group) == 0:
         apple = Apple(SCREEN_WIDTH, apple_sheet, 1.8)
         apple_group.add(apple)
-
-
 
 
 while run:
@@ -285,7 +267,7 @@ while run:
             print(p_x)
             p_y = platform.rect.y - random.randint(50, 100)
             p_type = random.randint(1, 2)
-            if p_type == 1 and score > 500:
+            if p_type == 1 and score >= 150:
                 p_moving = True
             else:
                 p_moving = False
@@ -294,7 +276,7 @@ while run:
             platform_group.add(platform)
 
         # Generate Enemy's
-        if len(enemy_group) == 0 and score >= 1000:
+        if len(enemy_group) == 0 and score >= 700:
             enemy = Enemy(SCREEN_WIDTH, 100, bird_sheet, 1.5)
             enemy_group.add(enemy)
 
@@ -307,7 +289,6 @@ while run:
         enemy_group.draw(screen)
         apple_group.update(scroll, SCREEN_WIDTH, SCREEN_HEIGHT)
         apple_group.draw(screen)
-
 
         # Draw Panel
         draw_panel(screen, score, font_small, WHITE, PANEL)
@@ -325,20 +306,26 @@ while run:
                          (SCREEN_WIDTH, score - high_score + SCROLL_THRESHOLD), 3)
 
         # Check for collisions
-        platform_collide(platform_group, platform)
+        collision.platform_collide(platform_group, platform, jump_fx)
 
         # Check game over
         if pepe.rect.top > SCREEN_HEIGHT:
             game_over = True
             death_fx.play()
         # Check collision with enemies
-        enemy_bird_collision = enemy_collide()
+        enemy_bird_collision = collision.enemy_collide(enemy_group)
         if enemy_bird_collision:
             game_over = True
             death_fx.play()
             print("Test")
 
-        #for event in pygame.event.get():
+        # Apple Collision Detection
+        apple_collision = collision.apple_collision(apple_group)
+        if apple_collision:
+            pepe.vel_y = -50
+
+
+        # for event in pygame.event.get():
 
 
     else:
@@ -383,7 +370,6 @@ while run:
             run = False
         if event.type == apple_event:
             apple_gen()
-
 
     # Update Display
     pygame.display.update()
